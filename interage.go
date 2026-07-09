@@ -3,7 +3,7 @@
 //
 // Uso básico:
 //
-//	cli, err := interage.NewClient("https://SEU-TENANT.wonit.cloud", "sk_xxxxxxxx", nil)
+//	cli, err := interage.NewClient("SEU-TENANT.wonit.cloud", "sk_xxxxxxxx", nil)
 //	if err != nil { ... }
 //
 //	campanhas, err := cli.Campaigns.List(ctx, interage.ListCampaignsParams{})
@@ -11,6 +11,7 @@ package interage
 
 import (
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -20,6 +21,9 @@ type Options struct {
 	Timeout time.Duration
 	// HTTPClient substitui o http.Client interno (proxy, transporte customizado, etc.).
 	HTTPClient *http.Client
+	// Insecure força HTTP (sem TLS) ao invés de HTTPS. Padrão: false.
+	// Útil para ambientes de desenvolvimento local.
+	Insecure bool
 }
 
 // Client é o ponto de entrada do SDK. Cada campo cobre um domínio da API pública.
@@ -36,7 +40,10 @@ type Client struct {
 
 // NewClient cria o cliente do SDK.
 //
-// baseURL é o endereço do seu tenant (ex.: https://SEU-TENANT.wonit.cloud) e
+// baseURL é o domínio do seu tenant (ex.: SEU-TENANT.wonit.cloud). Se informado
+// sem scheme (ex.: sem https://), o SDK adiciona https:// automaticamente.
+// Use Options.Insecure para forçar http:// (ambientes de desenvolvimento).
+//
 // token é o token de API no formato sk_<valor>, gerado no painel administrativo.
 // As permissões de cada rota (leitura, listagem, criação, alteração, remoção)
 // são configuradas por token no painel.
@@ -46,6 +53,15 @@ func NewClient(baseURL, token string, opts *Options) (*Client, error) {
 	}
 	if token == "" {
 		return nil, ErrInvalidToken
+	}
+
+	baseURL = strings.TrimRight(baseURL, "/")
+	if !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
+		scheme := "https"
+		if opts != nil && opts.Insecure {
+			scheme = "http"
+		}
+		baseURL = scheme + "://" + baseURL
 	}
 
 	var timeout time.Duration

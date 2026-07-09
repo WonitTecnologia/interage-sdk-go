@@ -26,8 +26,8 @@ import (
 )
 
 func main() {
-	// baseURL é o endereço do seu tenant; token é gerado no painel administrativo.
-	cli, err := interage.NewClient("https://SEU-TENANT.wonit.cloud", "sk_xxxxxxxxxxxx", nil)
+	// Domínio do seu tenant (https:// é adicionado automaticamente).
+	cli, err := interage.NewClient("SEU-TENANT.wonit.cloud", "sk_xxxxxxxxxxxx", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -50,10 +50,11 @@ func main() {
 
 | Campo | Obrigatório | Descrição |
 |---|---|---|
-| `baseURL` | sim | Endereço do tenant (ex.: `https://SEU-TENANT.wonit.cloud`) |
+| `baseURL` | sim | Domínio do tenant (ex.: `SEU-TENANT.wonit.cloud`). O SDK adiciona `https://` automaticamente. |
 | `token` | sim | Token de API `sk_<valor>` (painel administrativo → Tokens de API) |
 | `Options.Timeout` | não | Timeout do HTTP client interno (padrão: 30s) |
 | `Options.HTTPClient` | não | `*http.Client` customizado (proxy, transporte próprio, etc.) |
+| `Options.Insecure` | não | Força HTTP (sem TLS). Padrão: `false`. Use para dev local. |
 
 > As permissões de cada rota (leitura, listagem, criação, alteração, remoção) são
 > configuradas **por token** no painel. Sem a permissão, a API responde 401/403.
