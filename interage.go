@@ -7,6 +7,11 @@
 //	if err != nil { ... }
 //
 //	campanhas, err := cli.Campaigns.List(ctx, interage.ListCampaignsParams{})
+//
+// Todos os modelos (requests/responses) vivem neste pacote — import único.
+// Cada arquivo de domínio é dividido pelas seções Modelos / Interface / Implementação.
+// Em colisão de nome entre domínios, o tipo recebe o domínio como prefixo
+// (ex.: TelephonyTempLinkResponse e OmniTempLinkResponse).
 package interage
 
 import (

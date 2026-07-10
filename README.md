@@ -70,16 +70,19 @@ func main() {
 | `cli.Omni` | `OmniCase` | Filas, agentes, conversas (listar, histórico, encerrar, transferir, arquivos) |
 | `cli.Telephony` | `TelephonyCase` | Ramais, histórico de ligações, click-to-call, gravações |
 
-Os modelos de cada domínio ficam em pacotes próprios:
+Todos os modelos (requests/responses) vivem no **pacote principal** — um único import:
 
 ```go
-import (
-	"github.com/WonitTecnologia/interage-sdk-go/models/campaigns"
-	"github.com/WonitTecnologia/interage-sdk-go/models/messages"
-	"github.com/WonitTecnologia/interage-sdk-go/models/omni"
-	"github.com/WonitTecnologia/interage-sdk-go/models/telephony"
-)
+import interage "github.com/WonitTecnologia/interage-sdk-go"
+
+// interage.CreateCampaignRequest, interage.SendTemplateRequest,
+// interage.TransferConversationRequest, interage.OriginateCallRequest, ...
 ```
+
+Cada arquivo de domínio (`campaigns.go`, `messages.go`, `omni.go`, `telephony.go`) é
+organizado pelas seções **Modelos / Interface / Implementação**, separadas pelo divisor `─────`.
+Quando um nome de tipo colide entre domínios, o tipo recebe o **domínio como prefixo**
+(ex.: `TelephonyTempLinkResponse` e `OmniTempLinkResponse`).
 
 ---
 
@@ -93,12 +96,12 @@ O CSV deve ter delimitador `,` ou `;` e conter uma coluna de telefone
 ```go
 csv, _ := os.ReadFile("contatos.csv")
 
-resp, err := cli.Campaigns.Create(ctx, campaigns.CreateCampaignRequest{
+resp, err := cli.Campaigns.Create(ctx, interage.CreateCampaignRequest{
 	Name:            "Black Friday",
 	InstanceID:      "<instance_id>",           // de cli.Messages.ListInstances
 	TemplateID:      "<gupshup_id>",            // de cli.Messages.ListTemplates
 	TemplateParams:  []string{"João", "20/01"}, // variáveis do template, na ordem
-	CollisionPolicy: campaigns.CollisionIgnore, // ignore | overwrite | update_empty
+	CollisionPolicy: interage.CollisionIgnore, // ignore | overwrite | update_empty
 	FileName:        "contatos.csv",
 	FileContent:     csv,
 })
@@ -110,9 +113,9 @@ resp, err := cli.Campaigns.Create(ctx, campaigns.CreateCampaignRequest{
 
 | Valor | Comportamento |
 |---|---|
-| `campaigns.CollisionIgnore` | Mantém os dados atuais do contato |
-| `campaigns.CollisionOverwrite` | Sobrescreve nome/email/empresa com o CSV |
-| `campaigns.CollisionUpdateEmpty` | Preenche só os campos vazios |
+| `interage.CollisionIgnore` | Mantém os dados atuais do contato |
+| `interage.CollisionOverwrite` | Sobrescreve nome/email/empresa com o CSV |
+| `interage.CollisionUpdateEmpty` | Preenche só os campos vazios |
 
 Campos opcionais: `Description`, `StartAt`/`EndAt` (RFC3339), `AutoStart *bool`, `Settings map[string]any`.
 
@@ -147,7 +150,7 @@ inst, err := cli.Messages.ListInstances(ctx, 1, 50)
 tpls, err := cli.Messages.ListTemplates(ctx, interage.ListTemplatesParams{Status: "APPROVED"})
 
 // Enviar template
-env, err := cli.Messages.SendTemplate(ctx, messages.SendTemplateRequest{
+env, err := cli.Messages.SendTemplate(ctx, interage.SendTemplateRequest{
 	To:         "5547999999999",
 	TemplateID: "<gupshup_id>",
 	InstanceID: "<instance_id>",
@@ -155,7 +158,7 @@ env, err := cli.Messages.SendTemplate(ctx, messages.SendTemplateRequest{
 })
 
 // Enviar mensagem em sessão ativa (24h)
-msg, err := cli.Messages.SendMessage(ctx, messages.SendMessageRequest{
+msg, err := cli.Messages.SendMessage(ctx, interage.SendMessageRequest{
 	Protocol: "<protocolo>", Type: "text", Text: "Olá!",
 })
 
@@ -178,8 +181,8 @@ hist, err := cli.Omni.GetConversationHistory(ctx, "<protocolo>", 1, 50)
 fim, err := cli.Omni.CloseConversation(ctx, "<protocolo>")
 
 queueID := 3
-tr, err := cli.Omni.TransferConversation(ctx, "<protocolo>", omni.TransferConversationRequest{
-	TargetType: omni.TransferToQueue,
+tr, err := cli.Omni.TransferConversation(ctx, "<protocolo>", interage.TransferConversationRequest{
+	TargetType: interage.TransferToQueue,
 	QueueID:    &queueID,
 })
 
@@ -198,7 +201,7 @@ hist, err := cli.Telephony.ListCallHistory(ctx, interage.ListCallHistoryParams{
 	CallResult: "ANSWERED",
 })
 
-call, err := cli.Telephony.OriginateCall(ctx, telephony.OriginateCallRequest{
+call, err := cli.Telephony.OriginateCall(ctx, interage.OriginateCallRequest{
 	FromExtension: "1000",
 	ToNumber:      "5547999999999",
 })
@@ -249,11 +252,11 @@ tpls, _ := cli.Messages.ListTemplates(ctx, interage.ListTemplatesParams{
 
 // 2. Criar a campanha com o CSV
 csv, _ := os.ReadFile("contatos.csv")
-created, _ := cli.Campaigns.Create(ctx, campaigns.CreateCampaignRequest{
+created, _ := cli.Campaigns.Create(ctx, interage.CreateCampaignRequest{
 	Name:            "Campanha via SDK",
 	InstanceID:      inst.Items[0].InstanceID,
 	TemplateID:      tpls.Items[0].GupshupID,
-	CollisionPolicy: campaigns.CollisionIgnore,
+	CollisionPolicy: interage.CollisionIgnore,
 	FileName:        "contatos.csv",
 	FileContent:     csv,
 })
@@ -261,7 +264,7 @@ created, _ := cli.Campaigns.Create(ctx, campaigns.CreateCampaignRequest{
 // 3. Aguardar a importação (pending → ready) e iniciar
 for {
 	camp, _ := cli.Campaigns.Get(ctx, created.CampaignID)
-	if camp.Status == string(campaigns.CampaignStatusReady) {
+	if camp.Status == string(interage.CampaignStatusReady) {
 		break
 	}
 	time.Sleep(2 * time.Second)
