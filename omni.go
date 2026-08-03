@@ -2,6 +2,7 @@ package interage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -173,6 +174,65 @@ type OmniTempLinkResponse struct {
 	ExpiresAt string `json:"expires_at"`
 }
 
+// BatchContactIdentity é uma identidade de canal de um contato do lote.
+// Channel: whatsapp | sms | phone | telegram | instagram | facebook | sip.
+// IDType: phone | username | chat_id | handle | extension | profile_id.
+type BatchContactIdentity struct {
+	Channel   string `json:"channel"`
+	IDType    string `json:"id_type"`
+	IDValue   string `json:"id_value"`
+	IsPrimary bool   `json:"is_primary,omitempty"`
+}
+
+// BatchContactItem é um contato individual da criação em lote.
+type BatchContactItem struct {
+	// Name é o nome do contato. Obrigatório.
+	Name string `json:"name"`
+	// Identities são as formas de contato. Obrigatório ao menos uma.
+	Identities []BatchContactIdentity `json:"identities"`
+	// CPF do contato (opcional).
+	CPF string `json:"cpf,omitempty"`
+	// Email do contato (opcional).
+	Email string `json:"email,omitempty"`
+	// Company é a empresa do contato (opcional).
+	Company string `json:"company,omitempty"`
+	// CustomInfo são os valores dos campos personalizados do tenant
+	// (chaves = key dos campos cadastrados na central).
+	CustomInfo map[string]any `json:"custom_info,omitempty"`
+	// Labels são os nomes das etiquetas a atribuir. Inexistentes são ignoradas.
+	Labels []string `json:"labels,omitempty"`
+	// ReplaceName permite substituir o nome pelo perfil do canal (ex: WhatsApp).
+	ReplaceName *bool `json:"replace_name,omitempty"`
+}
+
+// BatchCreateContactsRequest é o payload da criação de contatos em lote.
+type BatchCreateContactsRequest struct {
+	// CollisionPolicy define o tratamento quando uma identidade já existe em
+	// outro contato do tenant. Opcional (padrão da API: CollisionIgnore).
+	CollisionPolicy CollisionPolicy `json:"collision_policy,omitempty"`
+	// Contacts lista de contatos a criar (mínimo 1, máximo 500).
+	Contacts []BatchContactItem `json:"contacts"`
+}
+
+// BatchContactResultItem é o resultado do processamento de um contato do lote.
+// Status: created | existing | updated | error.
+type BatchContactResultItem struct {
+	Index     int    `json:"index"`
+	Status    string `json:"status"`
+	ContactID string `json:"contact_id,omitempty"`
+	Message   string `json:"message,omitempty"`
+}
+
+// BatchCreateContactsResponse é o envelope do resultado da criação em lote.
+type BatchCreateContactsResponse struct {
+	Total    int                      `json:"total"`
+	Created  int                      `json:"created"`
+	Updated  int                      `json:"updated"`
+	Existing int                      `json:"existing"`
+	Errors   int                      `json:"errors"`
+	Items    []BatchContactResultItem `json:"items"`
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Interface
 // ─────────────────────────────────────────────────────────────────────────────
@@ -206,6 +266,9 @@ type OmniCase interface {
 	// CreateMessageFileTempLink gera link temporário de download do arquivo de uma mensagem.
 	// expiresIn em segundos (0 = padrão do servidor, 3600).
 	CreateMessageFileTempLink(ctx context.Context, messageID string, expiresIn int) (*OmniTempLinkResponse, error)
+	// BatchCreateContacts cria até 500 contatos de uma vez na central de contatos.
+	// Cada item é processado de forma independente — ver Items na resposta.
+	BatchCreateContacts(ctx context.Context, req BatchCreateContactsRequest) (*BatchCreateContactsResponse, error)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -283,6 +346,20 @@ func (o *omniClient) CreateMessageFileTempLink(ctx context.Context, messageID st
 	path := fmt.Sprintf(pathOmniMessageFileTempLink, url.PathEscape(messageID))
 	if err := o.http.post(ctx, path, q, nil, &out); err != nil {
 		return nil, fmt.Errorf("interage/omni.CreateMessageFileTempLink: %w", err)
+	}
+	return &out, nil
+}
+
+func (o *omniClient) BatchCreateContacts(ctx context.Context, req BatchCreateContactsRequest) (*BatchCreateContactsResponse, error) {
+	if len(req.Contacts) == 0 {
+		return nil, errors.New("interage/omni.BatchCreateContacts: informe ao menos um contato")
+	}
+	if len(req.Contacts) > 500 {
+		return nil, errors.New("interage/omni.BatchCreateContacts: lote excede o máximo de 500 contatos")
+	}
+	var out BatchCreateContactsResponse
+	if err := o.http.post(ctx, pathOmniContactsBatch, nil, req, &out); err != nil {
+		return nil, fmt.Errorf("interage/omni.BatchCreateContacts: %w", err)
 	}
 	return &out, nil
 }

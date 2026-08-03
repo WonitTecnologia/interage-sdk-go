@@ -67,7 +67,7 @@ func main() {
 |---|---|---|
 | `cli.Campaigns` | `CampaignsCase` | Campanhas de disparo WhatsApp (criar com CSV, listar, detalhar, iniciar, pausar, cancelar, remover) |
 | `cli.Messages` | `MessagesCase` | Instâncias, templates HSM, envio de template/mensagem, status de entrega |
-| `cli.Omni` | `OmniCase` | Filas, agentes, conversas (listar, histórico, encerrar, transferir, arquivos) |
+| `cli.Omni` | `OmniCase` | Filas, agentes, conversas (listar, histórico, encerrar, transferir, arquivos), contatos em lote |
 | `cli.Telephony` | `TelephonyCase` | Ramais, histórico de ligações, click-to-call, gravações |
 
 Todos os modelos (requests/responses) vivem no **pacote principal** — um único import:
@@ -188,6 +188,33 @@ tr, err := cli.Omni.TransferConversation(ctx, "<protocolo>", interage.TransferCo
 
 link, err := cli.Omni.CreateMessageFileTempLink(ctx, "<message_id>", 3600)
 ```
+
+### Criar contatos em lote
+
+Cria até 500 contatos de uma vez na central de contatos. Cada item é processado
+de forma independente — erros de um não impedem os demais (ver `Items` na resposta).
+
+```go
+resp, err := cli.Omni.BatchCreateContacts(ctx, interage.BatchCreateContactsRequest{
+	CollisionPolicy: interage.CollisionIgnore, // opcional — padrão: ignore
+	Contacts: []interage.BatchContactItem{
+		{
+			Name:  "João da Silva",
+			Email: "joao@empresa.com",
+			Identities: []interage.BatchContactIdentity{
+				{Channel: "whatsapp", IDType: "phone", IDValue: "5511999998888", IsPrimary: true},
+			},
+			Labels:     []string{"vip"},
+			CustomInfo: map[string]any{"codigo_cliente": "C-123"},
+		},
+	},
+})
+// resp.Created/Updated/Existing/Errors + resp.Items[i].Status/ContactID/Message
+```
+
+`CollisionPolicy` (mesma semântica das campanhas): `ignore` mantém o contato
+existente, `overwrite` sobrescreve os campos informados, `update_empty` preenche
+só os campos vazios. A colisão é detectada pelas identidades (canal + valor).
 
 ---
 

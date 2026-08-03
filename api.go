@@ -25,6 +25,7 @@ const (
 	pathOmniConversationClose    = "/api/public/omni/administrativo/conversations/%s/close"
 	pathOmniConversationTransfer = "/api/public/omni/administrativo/conversations/%s/transfer"
 	pathOmniMessageFileTempLink  = "/api/public/omni/administrativo/conversations/messages/%s/templink"
+	pathOmniContactsBatch        = "/api/public/omni/administrativo/contacts/batch"
 
 	// ── Pabx.Telefonia ───────────────────────────────────────────────────────
 	pathExtensions        = "/api/public/pabx/telefonia/ramais"
