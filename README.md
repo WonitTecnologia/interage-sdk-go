@@ -216,6 +216,12 @@ resp, err := cli.Omni.BatchCreateContacts(ctx, interage.BatchCreateContactsReque
 existente, `overwrite` sobrescreve os campos informados, `update_empty` preenche
 só os campos vazios. A colisão é detectada pelas identidades (canal + valor).
 
+**Limites por contato:** `Name` 255 chars, `CPF` 14, `Email`/`Company` 255,
+máx. 10 `Identities` (`IDValue` 255 chars), máx. 20 `Labels`, `CustomInfo` 10 KB.
+As etiquetas de `Labels` precisam **já existir** no tenant — etiqueta
+inexistente gera erro no item (`Items[i].Status == "error"`) e aquele contato
+não é criado nem atualizado.
+
 ---
 
 ## Telephony — ramais, histórico e click-to-call

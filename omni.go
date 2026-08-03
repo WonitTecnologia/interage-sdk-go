@@ -199,7 +199,9 @@ type BatchContactItem struct {
 	// CustomInfo são os valores dos campos personalizados do tenant
 	// (chaves = key dos campos cadastrados na central).
 	CustomInfo map[string]any `json:"custom_info,omitempty"`
-	// Labels são os nomes das etiquetas a atribuir. Inexistentes são ignoradas.
+	// Labels são os nomes das etiquetas a atribuir (máx. 20).
+	// ATENÇÃO: a etiqueta precisa existir no tenant — etiqueta inexistente
+	// gera erro no item e nada é criado/atualizado para aquele contato.
 	Labels []string `json:"labels,omitempty"`
 	// ReplaceName permite substituir o nome pelo perfil do canal (ex: WhatsApp).
 	ReplaceName *bool `json:"replace_name,omitempty"`
