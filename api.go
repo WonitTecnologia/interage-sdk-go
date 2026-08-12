@@ -27,9 +27,15 @@ const (
 	pathOmniMessageFileTempLink  = "/api/public/omni/administrativo/conversations/messages/%s/templink"
 	pathOmniContactsBatch        = "/api/public/omni/administrativo/contacts/batch"
 
+	// ── Omni.Administrativo.Contatos ───────────────────────────────────────────
+	pathContacts       = "/api/public/omni/administrativo/contacts"
+	pathContactByID    = "/api/public/omni/administrativo/contacts/%s"
+	pathContactByPhone = "/api/public/omni/administrativo/contacts/by-phone"
+
 	// ── Pabx.Telefonia ───────────────────────────────────────────────────────
 	pathExtensions        = "/api/public/pabx/telefonia/ramais"
 	pathCallHistory       = "/api/public/pabx/telefonia/historico"
 	pathOriginate         = "/api/public/pabx/telefonia/originate"
+	pathActiveCalls       = "/api/public/pabx/telefonia/chamadas-ativas"
 	pathRecordingTempLink = "/api/public/pabx/telefonia/historico/%s/recording/templink"
 )

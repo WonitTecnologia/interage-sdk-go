@@ -39,6 +39,8 @@ type Client struct {
 	Messages MessagesCase
 	// Omni — filas, agentes e conversas do atendimento omnichannel.
 	Omni OmniCase
+	// Contacts — central de contatos do tenant (listar, buscar por UUID ou telefone).
+	Contacts ContactsCase
 	// Telephony — ramais, histórico de ligações, click-to-call e gravações.
 	Telephony TelephonyCase
 }
@@ -81,6 +83,7 @@ func NewClient(baseURL, token string, opts *Options) (*Client, error) {
 		Campaigns: newCampaignsClient(hc),
 		Messages:  newMessagesClient(hc),
 		Omni:      newOmniClient(hc),
+		Contacts:  newContactsClient(hc),
 		Telephony: newTelephonyClient(hc),
 	}, nil
 }

@@ -93,6 +93,42 @@ type TelephonyTempLinkResponse struct {
 	ExpiresAt string `json:"expires_at"`
 }
 
+// ActiveCallResponse é uma chamada em curso no tenant.
+// Status é sempre "active" — o endpoint só lista chamadas em curso, sem
+// distinguir ringing de conversa em tempo real.
+type ActiveCallResponse struct {
+	CallID         string `json:"call_id"`
+	UniqueID       string `json:"unique_id"`
+	Channel        string `json:"channel"`
+	ProtocolNumber string `json:"protocol_number,omitempty"`
+	// Direction: inbound | outbound | internal
+	Direction      string `json:"direction,omitempty"`
+	CallerIDNum    string `json:"caller_id_num,omitempty"`
+	CallerIDName   string `json:"caller_id_name,omitempty"`
+	CalledNumber   string `json:"called_number,omitempty"`
+	DestinationNum string `json:"destination_num,omitempty"`
+	// DIDNumber é o número (DID) por onde a chamada entrou — apenas inbound.
+	DIDNumber string `json:"did_number,omitempty"`
+	TrunkName string `json:"trunk_name,omitempty"`
+	Status    string `json:"status"`
+	// StartTime/AnswerTime/AgentAnsweredAt em RFC3339.
+	StartTime       string `json:"start_time"`
+	AnswerTime      string `json:"answer_time,omitempty"`
+	AgentAnsweredAt string `json:"agent_answered_at,omitempty"`
+	// Duration é o tempo da chamada em segundos desde o início (inclui toque, URA e fila).
+	Duration       int    `json:"duration"`
+	QueueName      string `json:"queue_name,omitempty"`
+	AgentExtension string `json:"agent_extension,omitempty"`
+	AgentName      string `json:"agent_name,omitempty"`
+}
+
+// ListActiveCallsResponse é o envelope com as chamadas ativas do tenant no
+// momento da consulta (mais recentes primeiro; não é paginada).
+type ListActiveCallsResponse struct {
+	Total int                  `json:"total"`
+	Items []ActiveCallResponse `json:"items"`
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Interface
 // ─────────────────────────────────────────────────────────────────────────────
@@ -136,6 +172,8 @@ type TelephonyCase interface {
 	ListExtensions(ctx context.Context, params ListExtensionsParams) (*ListExtensionsResponse, error)
 	// ListCallHistory lista o histórico paginado de ligações do período.
 	ListCallHistory(ctx context.Context, params ListCallHistoryParams) (*ListCallHistoryResponse, error)
+	// ListActiveCalls lista as chamadas em curso no tenant (não paginada).
+	ListActiveCalls(ctx context.Context) (*ListActiveCallsResponse, error)
 	// OriginateCall origina uma chamada (click-to-call): o ramal toca primeiro
 	// e, ao atender, conecta ao número de destino.
 	OriginateCall(ctx context.Context, req OriginateCallRequest) (*OriginateCallResponse, error)
@@ -198,6 +236,14 @@ func (t *telephonyClient) OriginateCall(ctx context.Context, req OriginateCallRe
 	var out OriginateCallResponse
 	if err := t.http.post(ctx, pathOriginate, nil, req, &out); err != nil {
 		return nil, fmt.Errorf("interage/telephony.OriginateCall: %w", err)
+	}
+	return &out, nil
+}
+
+func (t *telephonyClient) ListActiveCalls(ctx context.Context) (*ListActiveCallsResponse, error) {
+	var out ListActiveCallsResponse
+	if err := t.http.get(ctx, pathActiveCalls, nil, &out); err != nil {
+		return nil, fmt.Errorf("interage/telephony.ListActiveCalls: %w", err)
 	}
 	return &out, nil
 }

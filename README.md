@@ -68,7 +68,8 @@ func main() {
 | `cli.Campaigns` | `CampaignsCase` | Campanhas de disparo WhatsApp (criar com CSV, listar, detalhar, iniciar, pausar, cancelar, remover) |
 | `cli.Messages` | `MessagesCase` | Instâncias, templates HSM, envio de template/mensagem, status de entrega |
 | `cli.Omni` | `OmniCase` | Filas, agentes, conversas (listar, histórico, encerrar, transferir, arquivos), contatos em lote |
-| `cli.Telephony` | `TelephonyCase` | Ramais, histórico de ligações, click-to-call, gravações |
+| `cli.Contacts` | `ContactsCase` | Central de contatos (listar, buscar por UUID ou telefone) |
+| `cli.Telephony` | `TelephonyCase` | Ramais, histórico de ligações, chamadas ativas, click-to-call, gravações |
 
 Todos os modelos (requests/responses) vivem no **pacote principal** — um único import:
 
@@ -79,7 +80,7 @@ import interage "github.com/WonitTecnologia/interage-sdk-go"
 // interage.TransferConversationRequest, interage.OriginateCallRequest, ...
 ```
 
-Cada arquivo de domínio (`campaigns.go`, `messages.go`, `omni.go`, `telephony.go`) é
+Cada arquivo de domínio (`campaigns.go`, `messages.go`, `omni.go`, `contacts.go`, `telephony.go`) é
 organizado pelas seções **Modelos / Interface / Implementação**, separadas pelo divisor `─────`.
 Quando um nome de tipo colide entre domínios, o tipo recebe o **domínio como prefixo**
 (ex.: `TelephonyTempLinkResponse` e `OmniTempLinkResponse`).
@@ -224,6 +225,26 @@ não é criado nem atualizado.
 
 ---
 
+## Contacts — central de contatos
+
+```go
+lista, err := cli.Contacts.ListContacts(ctx, interage.ListContactsParams{
+	Search: "joão", Page: 1, PageSize: 20,
+})
+
+contato, err := cli.Contacts.GetContact(ctx, "<contact_uuid>")
+
+contato, err = cli.Contacts.GetContactByPhone(ctx, "5547999999999")
+// ErrNotFound quando não existe contato com o número
+```
+
+`GetContactByPhone` normaliza o número para dígitos e busca nos canais `phone`,
+`whatsapp` e `sms`. Os telefones cadastrados aparecem em `contato.Identities`.
+
+> A criação de contatos em lote está no domínio Omni: `cli.Omni.BatchCreateContacts`.
+
+---
+
 ## Telephony — ramais, histórico e click-to-call
 
 ```go
@@ -233,6 +254,8 @@ hist, err := cli.Telephony.ListCallHistory(ctx, interage.ListCallHistoryParams{
 	DateFrom: "2026-07-01", DateTo: "2026-07-09", // obrigatórios, máx. 3 meses
 	CallResult: "ANSWERED",
 })
+
+ativas, err := cli.Telephony.ListActiveCalls(ctx) // chamadas em curso (não paginada)
 
 call, err := cli.Telephony.OriginateCall(ctx, interage.OriginateCallRequest{
 	FromExtension: "1000",
