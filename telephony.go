@@ -62,10 +62,12 @@ type CallHistoryResponse struct {
 
 // ListCallHistoryResponse é o envelope paginado do histórico de ligações.
 type ListCallHistoryResponse struct {
-	Total    int                   `json:"total"`
-	Page     int                   `json:"page"`
-	PageSize int                   `json:"page_size"`
-	Items    []CallHistoryResponse `json:"items"`
+	Total    int `json:"total"`
+	Page     int `json:"page"`
+	PageSize int `json:"page_size"`
+	// NextCursor, quando não vazio, é o Cursor da próxima página. Vazio = última página.
+	NextCursor string                `json:"next_cursor,omitempty"`
+	Items      []CallHistoryResponse `json:"items"`
 }
 
 // OriginateCallRequest são os dados do click-to-call.
@@ -164,6 +166,10 @@ type ListCallHistoryParams struct {
 	Page int
 	// PageSize é a quantidade por página (padrão: 10, máximo: 100).
 	PageSize int
+	// Cursor é o NextCursor da página anterior. Quando informado, a API ignora
+	// Page e continua de onde a página anterior parou — preferível ao Page para
+	// percorrer listas grandes.
+	Cursor string
 }
 
 // TelephonyCase expõe ramais, histórico de ligações, click-to-call e gravações.
@@ -224,6 +230,9 @@ func (t *telephonyClient) ListCallHistory(ctx context.Context, params ListCallHi
 	}
 	if params.CallType != "" {
 		q.Set("call_type", params.CallType)
+	}
+	if params.Cursor != "" {
+		q.Set("cursor", params.Cursor)
 	}
 	var out ListCallHistoryResponse
 	if err := t.http.get(ctx, pathCallHistory, q, &out); err != nil {

@@ -44,10 +44,12 @@ type ContactResponse struct {
 
 // ListContactsResponse é o envelope paginado da listagem de contatos.
 type ListContactsResponse struct {
-	Total    int               `json:"total"`
-	Page     int               `json:"page"`
-	PageSize int               `json:"page_size"`
-	Items    []ContactResponse `json:"items"`
+	Total    int `json:"total"`
+	Page     int `json:"page"`
+	PageSize int `json:"page_size"`
+	// NextCursor, quando não vazio, é o Cursor da próxima página. Vazio = última página.
+	NextCursor string            `json:"next_cursor,omitempty"`
+	Items      []ContactResponse `json:"items"`
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -64,6 +66,10 @@ type ListContactsParams struct {
 	Page int
 	// PageSize é a quantidade por página (padrão: 10, máximo: 100).
 	PageSize int
+	// Cursor é o NextCursor da página anterior. Quando informado, a API ignora
+	// Page e continua de onde a página anterior parou — preferível ao Page para
+	// percorrer listas grandes.
+	Cursor string
 }
 
 // ContactsCase expõe a central de contatos do tenant.
@@ -94,6 +100,9 @@ func (c *contactsClient) ListContacts(ctx context.Context, params ListContactsPa
 	}
 	if params.Name != "" {
 		q.Set("name", params.Name)
+	}
+	if params.Cursor != "" {
+		q.Set("cursor", params.Cursor)
 	}
 	var out ListContactsResponse
 	if err := c.http.get(ctx, pathContacts, q, &out); err != nil {

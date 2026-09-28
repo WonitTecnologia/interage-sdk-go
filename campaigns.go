@@ -98,16 +98,25 @@ type CampaignResponse struct {
 	ReadCount      int    `json:"read_count"`
 	RepliedCount   int    `json:"replied_count"`
 	FailedCount    int    `json:"failed_count"`
-	CreatedAt      string `json:"created_at"`
-	UpdatedAt      string `json:"updated_at"`
+	// ReplyWithoutContext indica se mensagem do contato sem citar o disparo nem
+	// clicar em botão também conta como resposta à campanha (RepliedCount),
+	// desde que chegue dentro de ReplyWindowHours após o disparo.
+	ReplyWithoutContext bool `json:"reply_without_context"`
+	// ReplyWindowHours é a janela, em horas após o disparo, em que a resposta sem
+	// citação conta (1 a 72; padrão 24). Só vale com ReplyWithoutContext.
+	ReplyWindowHours int    `json:"reply_window_hours"`
+	CreatedAt        string `json:"created_at"`
+	UpdatedAt        string `json:"updated_at"`
 }
 
 // ListCampaignsResponse é o envelope paginado da listagem de campanhas.
 type ListCampaignsResponse struct {
-	Total    int                `json:"total"`
-	Page     int                `json:"page"`
-	PageSize int                `json:"page_size"`
-	Items    []CampaignResponse `json:"items"`
+	Total    int `json:"total"`
+	Page     int `json:"page"`
+	PageSize int `json:"page_size"`
+	// NextCursor, quando não vazio, é o Cursor da próxima página. Vazio = última página.
+	NextCursor string             `json:"next_cursor,omitempty"`
+	Items      []CampaignResponse `json:"items"`
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -124,6 +133,10 @@ type ListCampaignsParams struct {
 	Page int
 	// PageSize é a quantidade por página (padrão: 10, máximo: 100).
 	PageSize int
+	// Cursor é o NextCursor da página anterior. Quando informado, a API ignora
+	// Page e continua de onde a página anterior parou — preferível ao Page para
+	// percorrer listas grandes.
+	Cursor string
 }
 
 // CampaignsCase expõe as operações de campanhas de disparo WhatsApp.
@@ -219,6 +232,9 @@ func (c *campaignsClient) List(ctx context.Context, params ListCampaignsParams) 
 	}
 	if params.Status != "" {
 		q.Set("status", params.Status)
+	}
+	if params.Cursor != "" {
+		q.Set("cursor", params.Cursor)
 	}
 	var out ListCampaignsResponse
 	if err := c.http.get(ctx, pathCampaigns, q, &out); err != nil {

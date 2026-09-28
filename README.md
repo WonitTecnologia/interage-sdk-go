@@ -205,8 +205,8 @@ resp, err := cli.Omni.BatchCreateContacts(ctx, interage.BatchCreateContactsReque
 			Identities: []interage.BatchContactIdentity{
 				{Channel: "whatsapp", IDType: "phone", IDValue: "5511999998888", IsPrimary: true},
 			},
-			Labels:     []string{"vip"},
-			CustomInfo: map[string]any{"codigo_cliente": "C-123"},
+			Labels:     []int64{1, 3}, // números das etiquetas, não os nomes
+			CustomInfo: map[string]string{"codigo_cliente": "C-123"},
 		},
 	},
 })
@@ -219,9 +219,16 @@ só os campos vazios. A colisão é detectada pelas identidades (canal + valor).
 
 **Limites por contato:** `Name` 255 chars, `CPF` 14, `Email`/`Company` 255,
 máx. 10 `Identities` (`IDValue` 255 chars), máx. 20 `Labels`, `CustomInfo` 10 KB.
-As etiquetas de `Labels` precisam **já existir** no tenant — etiqueta
-inexistente gera erro no item (`Items[i].Status == "error"`) e aquele contato
-não é criado nem atualizado.
+
+`Labels` recebe o **número** de cada etiqueta — o número sequencial exibido na
+gestão de etiquetas da central (Admin → Contatos → Etiquetas), não o nome. A
+etiqueta precisa **já existir e estar ativa** no tenant — etiqueta inexistente
+gera erro no item (`Items[i].Status == "error"`) e aquele contato não é criado
+nem atualizado.
+
+`CustomInfo` aceita só texto: números e datas vão como string
+(ex.: `"data_nascimento": "1990-05-20"`). As chaves são os `key` dos campos
+personalizados cadastrados na central.
 
 ---
 
@@ -237,6 +244,8 @@ contato, err := cli.Contacts.GetContact(ctx, "<contact_uuid>")
 contato, err = cli.Contacts.GetContactByPhone(ctx, "5547999999999")
 // ErrNotFound quando não existe contato com o número
 ```
+
+Para percorrer a base inteira, use o cursor (ver [Paginação](#paginação)).
 
 `GetContactByPhone` normaliza o número para dígitos e busca nos canais `phone`,
 `whatsapp` e `sms`. Os telefones cadastrados aparecem em `contato.Identities`.
@@ -290,7 +299,52 @@ if err != nil {
 ```
 
 Sentinelas disponíveis: `ErrBadRequest` (400), `ErrUnauthorized` (401), `ErrForbidden` (403),
-`ErrNotFound` (404), `ErrConflict` (409), `ErrUnprocessable` (422), `ErrInternalServer` (5xx).
+`ErrNotFound` (404), `ErrConflict` (409), `ErrUnprocessable` (422),
+`ErrTooManyRequests` (429), `ErrInternalServer` (5xx).
+
+### Limite de requisições (429)
+
+A API limita as requisições por token e por IP de origem. Ao exceder, responde
+429 e informa quanto esperar — disponível em `APIError.RetryAfter`:
+
+```go
+lista, err := cli.Contacts.ListContacts(ctx, params)
+if errors.Is(err, interage.ErrTooManyRequests) {
+	apiErr, _ := interage.AsAPIError(err)
+	time.Sleep(apiErr.RetryAfter) // zero quando a API não informou
+	lista, err = cli.Contacts.ListContacts(ctx, params)
+}
+```
+
+O SDK não repete a requisição sozinho — a decisão de esperar e tentar de novo
+fica com quem chama.
+
+---
+
+## Paginação
+
+As listagens aceitam `Page`/`PageSize` (padrão 10, máximo 100). Campanhas,
+contatos e histórico de ligações também paginam por **cursor**, mais indicado
+para percorrer listas grandes: passe o `NextCursor` da resposta como `Cursor`
+da próxima chamada. `NextCursor` vazio indica a última página; com `Cursor`
+informado, a API ignora `Page`.
+
+```go
+params := interage.ListContactsParams{PageSize: 100}
+for {
+	pagina, err := cli.Contacts.ListContacts(ctx, params)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, c := range pagina.Items {
+		fmt.Println(c.Name)
+	}
+	if pagina.NextCursor == "" {
+		break
+	}
+	params.Cursor = pagina.NextCursor
+}
+```
 
 ---
 

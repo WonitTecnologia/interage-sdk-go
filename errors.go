@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
+	"time"
 )
 
 // Erros sentinela do SDK. Use errors.Is para verificar a categoria do erro:
@@ -27,6 +29,9 @@ var (
 	ErrConflict = errors.New("interage: conflito de estado")
 	// ErrUnprocessable — 422: ação não permitida no estado atual (ex.: transição de status inválida).
 	ErrUnprocessable = errors.New("interage: ação não permitida no estado atual")
+	// ErrTooManyRequests — 429: limite de requisições excedido (por token ou por IP).
+	// Aguarde APIError.RetryAfter antes de tentar de novo.
+	ErrTooManyRequests = errors.New("interage: limite de requisições excedido")
 	// ErrInternalServer — 5xx: erro interno da API.
 	ErrInternalServer = errors.New("interage: erro interno do servidor")
 )
@@ -43,6 +48,10 @@ type APIError struct {
 	Status string `json:"status"`
 	// Message é a mensagem legível retornada pela API (pt-BR).
 	Message string `json:"message"`
+	// RetryAfter é quanto esperar antes de tentar de novo, lido do header
+	// Retry-After. Preenchido em 429 (ErrTooManyRequests); zero quando a API não
+	// informou.
+	RetryAfter time.Duration `json:"-"`
 }
 
 func (e *APIError) Error() string {
@@ -64,6 +73,8 @@ func (e *APIError) Unwrap() error {
 		return ErrConflict
 	case e.StatusCode == http.StatusUnprocessableEntity:
 		return ErrUnprocessable
+	case e.StatusCode == http.StatusTooManyRequests:
+		return ErrTooManyRequests
 	case e.StatusCode >= 500:
 		return ErrInternalServer
 	default:
@@ -85,9 +96,9 @@ func AsAPIError(err error) (*APIError, bool) {
 	return nil, false
 }
 
-// parseAPIError monta o APIError a partir do corpo da resposta.
-func parseAPIError(statusCode int, body []byte) error {
-	apiErr := &APIError{StatusCode: statusCode}
+// parseAPIError monta o APIError a partir do corpo e dos headers da resposta.
+func parseAPIError(statusCode int, header http.Header, body []byte) error {
+	apiErr := &APIError{StatusCode: statusCode, RetryAfter: parseRetryAfter(header.Get("Retry-After"))}
 	_ = json.Unmarshal(body, apiErr)
 	if apiErr.Status == "" {
 		apiErr.Status = http.StatusText(statusCode)
@@ -96,4 +107,14 @@ func parseAPIError(statusCode int, body []byte) error {
 		apiErr.Message = string(body)
 	}
 	return apiErr
+}
+
+// parseRetryAfter lê o header Retry-After em segundos (formato usado pela API).
+// Valor ausente ou inválido resulta em zero.
+func parseRetryAfter(v string) time.Duration {
+	secs, err := strconv.Atoi(v)
+	if err != nil || secs <= 0 {
+		return 0
+	}
+	return time.Duration(secs) * time.Second
 }

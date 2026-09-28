@@ -15,7 +15,7 @@ import (
 
 const (
 	defaultTimeout = 30 * time.Second
-	userAgent      = "interage-sdk-go"
+	userAgent      = "interage-sdk-go/" + Version
 )
 
 // httpClient é o transporte interno compartilhado por todos os domínios.
@@ -80,7 +80,7 @@ func (c *httpClient) do(ctx context.Context, method, path string, query url.Valu
 	}
 
 	if resp.StatusCode >= 400 {
-		return parseAPIError(resp.StatusCode, respBody)
+		return parseAPIError(resp.StatusCode, resp.Header, respBody)
 	}
 
 	if out == nil {

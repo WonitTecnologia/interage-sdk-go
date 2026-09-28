@@ -197,12 +197,14 @@ type BatchContactItem struct {
 	// Company é a empresa do contato (opcional).
 	Company string `json:"company,omitempty"`
 	// CustomInfo são os valores dos campos personalizados do tenant
-	// (chaves = key dos campos cadastrados na central).
-	CustomInfo map[string]any `json:"custom_info,omitempty"`
-	// Labels são os nomes das etiquetas a atribuir (máx. 20).
-	// ATENÇÃO: a etiqueta precisa existir no tenant — etiqueta inexistente
-	// gera erro no item e nada é criado/atualizado para aquele contato.
-	Labels []string `json:"labels,omitempty"`
+	// (chaves = key dos campos cadastrados na central). Os valores são sempre
+	// texto — números e datas vão como string (ex.: "1990-05-20"). Máx. 10 KB.
+	CustomInfo map[string]string `json:"custom_info,omitempty"`
+	// Labels são os números das etiquetas a atribuir (máx. 20) — o número
+	// sequencial exibido na gestão de etiquetas da central, não o nome.
+	// ATENÇÃO: a etiqueta precisa existir e estar ativa no tenant — etiqueta
+	// inexistente gera erro no item e nada é criado/atualizado para aquele contato.
+	Labels []int64 `json:"labels,omitempty"`
 	// ReplaceName permite substituir o nome pelo perfil do canal (ex: WhatsApp).
 	ReplaceName *bool `json:"replace_name,omitempty"`
 }
@@ -241,9 +243,9 @@ type BatchCreateContactsResponse struct {
 
 // ListConversationsParams filtra a listagem de conversas.
 type ListConversationsParams struct {
-	// Status filtra por status da conversa (ex.: bot, waiting, in_progress).
+	// Status filtra por status da conversa: bot | ai_agent | queue | attending (vazio = todas as ativas).
 	Status string
-	// ChannelType filtra por tipo de canal (ex.: whatsapp, webchat).
+	// ChannelType filtra por tipo de canal: whatsapp | telegram | instagram | email.
 	ChannelType string
 	// Page é a página (padrão: 1).
 	Page int

@@ -20,6 +20,9 @@ import (
 	"time"
 )
 
+// Version é a versão do SDK, enviada no User-Agent (interage-sdk-go/<Version>).
+const Version = "0.3.0"
+
 // Options configura opções adicionais do cliente. Todos os campos são opcionais.
 type Options struct {
 	// Timeout do http.Client interno. Padrão: 30s. Ignorado se HTTPClient for informado.
