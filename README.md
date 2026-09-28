@@ -57,7 +57,8 @@ func main() {
 | `Options.Insecure` | não | Força HTTP (sem TLS). Padrão: `false`. Use para dev local. |
 
 > As permissões de cada rota (leitura, listagem, criação, alteração, remoção) são
-> configuradas **por token** no painel. Sem a permissão, a API responde 401/403.
+> configuradas **por token** no painel. Token ausente, inválido, expirado ou
+> revogado responde **401**; token válido sem a rota ou sem a ação responde **403**.
 
 ---
 
@@ -287,7 +288,9 @@ if err != nil {
 	case errors.Is(err, interage.ErrNotFound):
 		// campanha não existe
 	case errors.Is(err, interage.ErrUnauthorized):
-		// token inválido ou sem a permissão exigida
+		// token ausente, inválido, expirado ou revogado — corrigir a credencial
+	case errors.Is(err, interage.ErrForbidden):
+		// token válido sem a rota ou sem a ação (ex.: listagem) — liberar no painel
 	case errors.Is(err, interage.ErrUnprocessable):
 		// ação não permitida no estado atual (ex.: iniciar campanha cancelada)
 	}

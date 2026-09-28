@@ -19,10 +19,13 @@ var (
 	ErrInvalidBaseURL = errors.New("interage: baseURL não pode ser vazia")
 	// ErrBadRequest — 400: parâmetros inválidos.
 	ErrBadRequest = errors.New("interage: requisição inválida")
-	// ErrUnauthorized — 401: token ausente, inválido ou sem a permissão exigida pela rota.
-	ErrUnauthorized = errors.New("interage: não autorizado — token inválido ou sem permissão")
-	// ErrForbidden — 403: rota não liberada para o token (verifique as permissões em api_routes).
-	ErrForbidden = errors.New("interage: acesso negado — rota não liberada para o token")
+	// ErrUnauthorized — 401: token ausente, inválido, expirado ou revogado.
+	// A credencial precisa ser corrigida (gerar/renovar o token no painel).
+	ErrUnauthorized = errors.New("interage: não autorizado — token ausente, inválido, expirado ou revogado")
+	// ErrForbidden — 403: token válido, mas a rota não foi liberada para ele ou
+	// falta a ação exigida (leitura, listagem, criação, alteração ou remoção).
+	// Trocar de token não resolve — libere a ação nas permissões do token no painel.
+	ErrForbidden = errors.New("interage: acesso negado — token sem permissão para esta rota ou ação")
 	// ErrNotFound — 404: recurso não encontrado.
 	ErrNotFound = errors.New("interage: recurso não encontrado")
 	// ErrConflict — 409: conflito de estado (ex.: ramal já em chamada).
