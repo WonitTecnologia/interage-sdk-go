@@ -119,7 +119,12 @@ resp, err := cli.Campaigns.Create(ctx, interage.CreateCampaignRequest{
 | `interage.CollisionOverwrite` | Sobrescreve nome/email/empresa com o CSV |
 | `interage.CollisionUpdateEmpty` | Preenche só os campos vazios |
 
-Campos opcionais: `Description`, `StartAt`/`EndAt` (RFC3339), `AutoStart *bool`, `Settings map[string]any`.
+Campos opcionais: `Description`, `StartAt`/`EndAt` (RFC3339), `AutoStart *bool`, `Settings map[string]any`,
+`ReplyWithoutContext *bool` e `ReplyWindowHours int` (1 a 72; padrão da API: 24).
+
+Por padrão só conta como resposta à campanha a mensagem que cita o disparo ou clica num
+botão do template. Com `ReplyWithoutContext`, a primeira mensagem do contato dentro de
+`ReplyWindowHours` após o disparo também conta, desde que abra uma conversa nova.
 
 ### Listar, detalhar e controlar
 
@@ -305,10 +310,16 @@ Sentinelas disponíveis: `ErrBadRequest` (400), `ErrUnauthorized` (401), `ErrFor
 `ErrNotFound` (404), `ErrConflict` (409), `ErrUnprocessable` (422),
 `ErrTooManyRequests` (429), `ErrInternalServer` (5xx).
 
+`503` indica falha temporária da plataforma (ex.: banco indisponível) e cai em
+`ErrInternalServer` — vale tentar de novo. Diferente do `401`: este é sempre a
+credencial, e repetir com o mesmo token não resolve.
+
 ### Limite de requisições (429)
 
 A API limita as requisições por token e por IP de origem. Ao exceder, responde
-429 e informa quanto esperar — disponível em `APIError.RetryAfter`:
+429 e informa quanto esperar — disponível em `APIError.RetryAfter`. Um IP que
+acumula 20 respostas `401` em um minuto também recebe 429 até a janela fechar:
+corrija o token em vez de repetir.
 
 ```go
 lista, err := cli.Contacts.ListContacts(ctx, params)

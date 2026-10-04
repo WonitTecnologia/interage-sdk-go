@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -68,6 +69,13 @@ type CreateCampaignRequest struct {
 	EndAt string
 	// AutoStart, quando true, inicia a campanha automaticamente em StartAt.
 	AutoStart *bool
+	// ReplyWithoutContext, quando true, conta como resposta à campanha a primeira
+	// mensagem do contato que não cita o disparo nem clica em botão, desde que chegue
+	// dentro de ReplyWindowHours e abra uma conversa nova. Nil = padrão da API (false).
+	ReplyWithoutContext *bool
+	// ReplyWindowHours é a janela, em horas após o disparo, da resposta sem citação
+	// (1 a 72). Zero = padrão da API (24). Só vale com ReplyWithoutContext.
+	ReplyWindowHours int
 	// Settings são configurações extras (ex.: {"delay_ms": 1000}).
 	Settings map[string]any
 }
@@ -183,6 +191,9 @@ func (c *campaignsClient) Create(ctx context.Context, req CreateCampaignRequest)
 	if req.FileName == "" || len(req.FileContent) == 0 {
 		return nil, errors.New("interage/campaigns.Create: FileName e FileContent são obrigatórios")
 	}
+	if req.ReplyWindowHours < 0 || req.ReplyWindowHours > 72 {
+		return nil, errors.New("interage/campaigns.Create: ReplyWindowHours deve estar entre 1 e 72")
+	}
 
 	fields := map[string]string{
 		"name":             req.Name,
@@ -209,6 +220,12 @@ func (c *campaignsClient) Create(ctx context.Context, req CreateCampaignRequest)
 	}
 	if req.AutoStart != nil {
 		fields["auto_start"] = fmt.Sprintf("%t", *req.AutoStart)
+	}
+	if req.ReplyWithoutContext != nil {
+		fields["reply_without_context"] = fmt.Sprintf("%t", *req.ReplyWithoutContext)
+	}
+	if req.ReplyWindowHours > 0 {
+		fields["reply_window_hours"] = strconv.Itoa(req.ReplyWindowHours)
 	}
 	if len(req.Settings) > 0 {
 		b, err := json.Marshal(req.Settings)

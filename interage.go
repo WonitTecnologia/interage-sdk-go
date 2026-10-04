@@ -21,7 +21,7 @@ import (
 )
 
 // Version é a versão do SDK, enviada no User-Agent (interage-sdk-go/<Version>).
-const Version = "0.3.0"
+const Version = "0.3.1"
 
 // Options configura opções adicionais do cliente. Todos os campos são opcionais.
 type Options struct {

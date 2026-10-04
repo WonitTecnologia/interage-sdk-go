@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strconv"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -161,7 +162,8 @@ type MessagesCase interface {
 	SendTemplate(ctx context.Context, req SendTemplateRequest) (*SendTemplateResponse, error)
 	// SendMessage envia uma mensagem não-template sobre uma conversa com sessão ativa de 24h.
 	SendMessage(ctx context.Context, req SendMessageRequest) (*SendMessageResponse, error)
-	// GetMessageStatus consulta o status de entrega pelo internal_message_id.
+	// GetMessageStatus consulta o status de entrega pelo internal_message_id
+	// (numérico, como string — ex.: "1042").
 	GetMessageStatus(ctx context.Context, messageID string) (*MessageStatusResponse, error)
 }
 
@@ -219,6 +221,9 @@ func (m *messagesClient) SendMessage(ctx context.Context, req SendMessageRequest
 }
 
 func (m *messagesClient) GetMessageStatus(ctx context.Context, messageID string) (*MessageStatusResponse, error) {
+	if id, err := strconv.ParseInt(messageID, 10, 64); err != nil || id <= 0 {
+		return nil, fmt.Errorf("interage/messages.GetMessageStatus: messageID deve ser o internal_message_id numérico, recebido %q", messageID)
+	}
 	q := url.Values{}
 	q.Set("message_id", messageID)
 	var out MessageStatusResponse

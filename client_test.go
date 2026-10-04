@@ -1,10 +1,13 @@
 package interage
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -221,5 +224,83 @@ func TestCampanhaCamposDeResposta(t *testing.T) {
 	}
 	if !c.ReplyWithoutContext || c.ReplyWindowHours != 48 {
 		t.Errorf("ReplyWithoutContext=%v ReplyWindowHours=%d, want true/48", c.ReplyWithoutContext, c.ReplyWindowHours)
+	}
+}
+
+// campaignForm decodifica o multipart capturado pelo fakeAPI.
+func campaignForm(t *testing.T, got *captured) map[string]string {
+	t.Helper()
+	_, params, err := mime.ParseMediaType(got.header.Get("Content-Type"))
+	if err != nil {
+		t.Fatalf("Content-Type inválido: %v", err)
+	}
+	form, err := multipart.NewReader(bytes.NewReader(got.body), params["boundary"]).ReadForm(1 << 20)
+	if err != nil {
+		t.Fatalf("multipart inválido: %v", err)
+	}
+	out := map[string]string{}
+	for k, v := range form.Value {
+		out[k] = v[0]
+	}
+	return out
+}
+
+func baseCampaignRequest() CreateCampaignRequest {
+	return CreateCampaignRequest{
+		Name: "c", InstanceID: "i", TemplateID: "t", CollisionPolicy: CollisionIgnore,
+		FileName: "c.csv", FileContent: []byte("phone\n5511999998888\n"),
+	}
+}
+
+func TestCreateCampaignEnviaRespostaSemReply(t *testing.T) {
+	cli, got := fakeAPI(t, 201, nil, ok(`{"campaign_id":"c1","status":"pending"}`))
+	req := baseCampaignRequest()
+	on := true
+	req.ReplyWithoutContext = &on
+	req.ReplyWindowHours = 48
+	if _, err := cli.Campaigns.Create(context.Background(), req); err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	form := campaignForm(t, got)
+	if form["reply_without_context"] != "true" || form["reply_window_hours"] != "48" {
+		t.Fatalf("campos de resposta sem reply = %q/%q, want true/48", form["reply_without_context"], form["reply_window_hours"])
+	}
+}
+
+func TestCreateCampaignOmiteRespostaSemReplyNaoInformada(t *testing.T) {
+	cli, got := fakeAPI(t, 201, nil, ok(`{"campaign_id":"c1","status":"pending"}`))
+	if _, err := cli.Campaigns.Create(context.Background(), baseCampaignRequest()); err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	form := campaignForm(t, got)
+	for _, k := range []string{"reply_without_context", "reply_window_hours"} {
+		if _, sent := form[k]; sent {
+			t.Errorf("%s enviado sem ter sido informado", k)
+		}
+	}
+}
+
+func TestCreateCampaignRecusaJanelaForaDoIntervalo(t *testing.T) {
+	cli, _ := fakeAPI(t, 201, nil, ok(`{}`))
+	req := baseCampaignRequest()
+	req.ReplyWindowHours = 73
+	if _, err := cli.Campaigns.Create(context.Background(), req); err == nil {
+		t.Fatal("ReplyWindowHours=73 deveria falhar antes de chamar a API")
+	}
+}
+
+func TestGetMessageStatusRecusaIDNaoNumerico(t *testing.T) {
+	cli, got := fakeAPI(t, 200, nil, ok(`{"id":1,"status":"sent"}`))
+	if _, err := cli.Messages.GetMessageStatus(context.Background(), "abc"); err == nil {
+		t.Fatal("messageID não numérico deveria falhar")
+	}
+	if got.method != "" {
+		t.Fatal("a API não deveria ser chamada com messageID inválido")
+	}
+	if _, err := cli.Messages.GetMessageStatus(context.Background(), "1042"); err != nil {
+		t.Fatalf("messageID numérico: erro inesperado %v", err)
+	}
+	if got.query["message_id"] != "1042" {
+		t.Fatalf("message_id = %q, want 1042", got.query["message_id"])
 	}
 }
