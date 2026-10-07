@@ -318,8 +318,9 @@ credencial, e repetir com o mesmo token não resolve.
 
 A API limita as requisições por token e por IP de origem. Ao exceder, responde
 429 e informa quanto esperar — disponível em `APIError.RetryAfter`. Um IP que
-acumula 20 respostas `401` em um minuto também recebe 429 até a janela fechar:
-corrija o token em vez de repetir.
+acumula 20 respostas `401` em um minuto também recebe 429 até a janela fechar —
+exceto para tokens que autenticaram nos últimos 10 minutos, que seguem
+funcionando. Corrija o token em vez de repetir.
 
 ```go
 lista, err := cli.Contacts.ListContacts(ctx, params)
