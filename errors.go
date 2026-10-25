@@ -32,7 +32,7 @@ var (
 	ErrConflict = errors.New("interage: conflito de estado")
 	// ErrUnprocessable — 422: ação não permitida no estado atual (ex.: transição de status inválida).
 	ErrUnprocessable = errors.New("interage: ação não permitida no estado atual")
-	// ErrTooManyRequests — 429: limite de requisições excedido (por token ou por IP).
+	// ErrTooManyRequests — 429: limite de requisições excedido (cota do cliente, somando todos os tokens dele, ou teto por IP).
 	// Aguarde APIError.RetryAfter antes de tentar de novo.
 	ErrTooManyRequests = errors.New("interage: limite de requisições excedido")
 	// ErrInternalServer — 5xx: erro interno da API.
