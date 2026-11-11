@@ -99,9 +99,11 @@ type TelephonyTempLinkResponse struct {
 // Status é sempre "active" — o endpoint só lista chamadas em curso, sem
 // distinguir ringing de conversa em tempo real.
 type ActiveCallResponse struct {
-	CallID         string `json:"call_id"`
-	UniqueID       string `json:"unique_id"`
-	Channel        string `json:"channel"`
+	CallID   string `json:"call_id"`
+	UniqueID string `json:"unique_id"`
+	// Deprecated: a API não devolve mais channel (canal interno do PABX); o campo
+	// fica sempre vazio. Identifique a chamada por CallID.
+	Channel        string `json:"-"`
 	ProtocolNumber string `json:"protocol_number,omitempty"`
 	// Direction: inbound | outbound | internal
 	Direction      string `json:"direction,omitempty"`
@@ -152,13 +154,15 @@ type ListCallHistoryParams struct {
 	DateFrom string
 	// DateTo é o fim do período (ex.: 2026-07-09). Obrigatório.
 	DateTo string
-	// CallerIDNum filtra por número de origem.
+	// CallerIDNum filtra por número de origem (busca parcial).
 	CallerIDNum string
-	// CalledNumber filtra por número chamado.
+	// CalledNumber filtra por número chamado (busca parcial).
 	CalledNumber string
-	// Extension filtra por ramal.
+	// Extension filtra pelo ramal exato em origem, destino, atendente ou transferência.
+	// Para prefixo, termine com * (ex.: "10*" traz 10, 100, 1017).
 	Extension string
-	// CallResult filtra por resultado: ANSWERED, NO ANSWER, BUSY, FAILED.
+	// CallResult filtra por resultado: ANSWERED | NO_ANSWER | BUSY | FAILED | ABANDONED |
+	// IVR_ENDED | VOICEMAIL | UNAVAILABLE.
 	CallResult string
 	// CallType filtra por tipo de chamada (ex.: inbound, outbound, internal).
 	CallType string
@@ -184,7 +188,8 @@ type TelephonyCase interface {
 	// e, ao atender, conecta ao número de destino.
 	OriginateCall(ctx context.Context, req OriginateCallRequest) (*OriginateCallResponse, error)
 	// CreateRecordingTempLink gera link temporário de download da gravação de uma ligação.
-	// expiresIn em segundos (0 = padrão do servidor, 3600).
+	// expiresIn em segundos, de 1 a 604800 (0 = padrão do servidor, 3600).
+	// Gravação arquivada pela retenção: ErrGone (410), sem restauração.
 	CreateRecordingTempLink(ctx context.Context, callID string, expiresIn int) (*TelephonyTempLinkResponse, error)
 }
 

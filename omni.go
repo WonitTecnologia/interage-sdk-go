@@ -2,6 +2,7 @@ package interage
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -104,18 +105,36 @@ type ConversationSummaryResponse struct {
 	FinishedAt        string `json:"finished_at,omitempty"`
 }
 
+// MessageReactionResponse é uma reação (emoji) a uma mensagem, uma por remetente.
+type MessageReactionResponse struct {
+	Emoji string `json:"emoji"`
+	// SentBy: client | bot | ai_agent | agent | agent_coex.
+	SentBy string `json:"sent_by"`
+}
+
 // ConversationMessageResponse é uma mensagem do histórico da conversa.
 type ConversationMessageResponse struct {
-	ID          int64  `json:"id"`
-	Direction   string `json:"direction"`
+	ID        int64  `json:"id"`
+	Direction string `json:"direction"`
+	// SentBy: client | bot | ai_agent | agent | agent_coex.
 	SentBy      string `json:"sent_by,omitempty"`
 	MessageType string `json:"message_type"`
 	Content     string `json:"content,omitempty"`
 	Caption     string `json:"caption,omitempty"`
-	MediaURL    string `json:"media_url,omitempty"`
-	MediaMime   string `json:"media_mime,omitempty"`
-	Status      string `json:"status"`
-	CreatedAt   string `json:"created_at"`
+	// MediaURL é a referência do arquivo, sem credencial. Para baixar, gere o link em
+	// CreateMessageFileTempLink.
+	MediaURL      string `json:"media_url,omitempty"`
+	MediaMime     string `json:"media_mime,omitempty"`
+	MediaFileName string `json:"media_file_name,omitempty"`
+	Status        string `json:"status"`
+	// Edited indica conteúdo editado pelo remetente.
+	Edited bool `json:"edited"`
+	// RemovedAt vem quando o remetente apagou a mensagem para todos; o conteúdo
+	// original permanece.
+	RemovedAt string `json:"removed_at,omitempty"`
+	// Reactions são as reações à mensagem, uma por remetente.
+	Reactions []MessageReactionResponse `json:"reactions,omitempty"`
+	CreatedAt string                    `json:"created_at"`
 }
 
 // ConversationHistoryResponse é o histórico paginado de uma conversa.
@@ -125,6 +144,13 @@ type ConversationHistoryResponse struct {
 	Page         int                           `json:"page"`
 	PageSize     int                           `json:"page_size"`
 	Items        []ConversationMessageResponse `json:"items"`
+}
+
+// CloseConversationRequest é o corpo opcional do encerramento de conversa.
+type CloseConversationRequest struct {
+	// Classification é a classificação do atendimento: obrigatória se a fila exigir e,
+	// com opções cadastradas na fila, precisa ser uma delas (senão a API responde 422).
+	Classification string `json:"classification,omitempty"`
 }
 
 // CloseConversationResponse é o retorno do encerramento de conversa.
@@ -149,7 +175,8 @@ const (
 type TransferConversationRequest struct {
 	// TargetType é o tipo de destino: queue ou user. Obrigatório.
 	TargetType TransferTargetType `json:"target_type"`
-	// QueueID é o ID da fila de destino (para TargetType=queue).
+	// QueueID é o ID da fila de destino. Obrigatório com TargetType=queue; com
+	// TargetType=user, opcional: troca a fila da conversa ao atribuir ao agente.
 	QueueID *int `json:"queue_id,omitempty"`
 	// UserID é o ID do agente de destino (para TargetType=user).
 	UserID string `json:"user_id,omitempty"`
@@ -175,8 +202,8 @@ type OmniTempLinkResponse struct {
 }
 
 // BatchContactIdentity é uma identidade de canal de um contato do lote.
-// Channel: whatsapp | sms | phone | telegram | instagram | facebook | sip.
-// IDType: phone | username | chat_id | handle | extension | profile_id.
+// Combinações aceitas: phone→phone; whatsapp→phone|username; telegram→chat_id|username;
+// instagram→handle|profile_id; facebook→handle|profile_id; sip→extension.
 type BatchContactIdentity struct {
 	Channel   string `json:"channel"`
 	IDType    string `json:"id_type"`
@@ -190,15 +217,20 @@ type BatchContactItem struct {
 	Name string `json:"name"`
 	// Identities são as formas de contato. Obrigatório ao menos uma.
 	Identities []BatchContactIdentity `json:"identities"`
-	// CPF do contato (opcional).
+	// CPF do contato (opcional, com ou sem pontuação). Vazio não é enviado; para
+	// limpar o CPF de um contato existente com CollisionOverwrite, use ClearCPF.
 	CPF string `json:"cpf,omitempty"`
+	// ClearCPF envia cpf vazio: com CollisionOverwrite, apaga o CPF do contato existente.
+	// Ignorado quando CPF está preenchido.
+	ClearCPF bool `json:"-"`
 	// Email do contato (opcional).
 	Email string `json:"email,omitempty"`
 	// Company é a empresa do contato (opcional).
 	Company string `json:"company,omitempty"`
 	// CustomInfo são os valores dos campos personalizados do tenant
-	// (chaves = key dos campos cadastrados na central). Os valores são sempre
-	// texto — números e datas vão como string (ex.: "1990-05-20"). Máx. 10 KB.
+	// (chaves = key dos campos cadastrados e ativos na central; chave desconhecida é
+	// erro no item). A API só aceita texto — números e datas vão como string
+	// (ex.: "1990-05-20"). Máx. 10 KB.
 	CustomInfo map[string]string `json:"custom_info,omitempty"`
 	// Labels são os números das etiquetas a atribuir (máx. 20) — o número
 	// sequencial exibido na gestão de etiquetas da central, não o nome.
@@ -207,6 +239,18 @@ type BatchContactItem struct {
 	Labels []int64 `json:"labels,omitempty"`
 	// ReplaceName permite substituir o nome pelo perfil do canal (ex: WhatsApp).
 	ReplaceName *bool `json:"replace_name,omitempty"`
+}
+
+// MarshalJSON envia "cpf": "" quando ClearCPF está marcado e CPF vazio.
+func (b BatchContactItem) MarshalJSON() ([]byte, error) {
+	type item BatchContactItem
+	if !b.ClearCPF || b.CPF != "" {
+		return json.Marshal(item(b))
+	}
+	return json.Marshal(struct {
+		item
+		CPF string `json:"cpf"`
+	}{item: item(b), CPF: ""})
 }
 
 // BatchCreateContactsRequest é o payload da criação de contatos em lote.
@@ -243,9 +287,10 @@ type BatchCreateContactsResponse struct {
 
 // ListConversationsParams filtra a listagem de conversas.
 type ListConversationsParams struct {
-	// Status filtra por status da conversa: bot | ai_agent | queue | attending (vazio = todas as ativas).
+	// Status filtra por status da conversa: bot | ai_agent | queue | attending | coex
+	// (vazio = todas as ativas). coex = atendida pelo celular (coexistência).
 	Status string
-	// ChannelType filtra por tipo de canal: whatsapp | telegram | instagram | email.
+	// ChannelType filtra por tipo de canal: whatsapp | telegram | instagram | facebook | webchat | email.
 	ChannelType string
 	// Page é a página (padrão: 1).
 	Page int
@@ -263,8 +308,11 @@ type OmniCase interface {
 	ListConversations(ctx context.Context, params ListConversationsParams) (*ListConversationsResponse, error)
 	// GetConversationHistory retorna as mensagens de uma conversa pelo protocolo, paginado.
 	GetConversationHistory(ctx context.Context, protocol string, page, pageSize int) (*ConversationHistoryResponse, error)
-	// CloseConversation encerra uma conversa ativa pelo protocolo.
+	// CloseConversation encerra uma conversa ativa pelo protocolo, sem classificação.
+	// Se a fila exige classificação, use CloseConversationWith.
 	CloseConversation(ctx context.Context, protocol string) (*CloseConversationResponse, error)
+	// CloseConversationWith encerra a conversa informando a classificação do atendimento.
+	CloseConversationWith(ctx context.Context, protocol string, req CloseConversationRequest) (*CloseConversationResponse, error)
 	// TransferConversation transfere a conversa para uma fila ou um agente.
 	TransferConversation(ctx context.Context, protocol string, req TransferConversationRequest) (*TransferConversationResponse, error)
 	// CreateMessageFileTempLink gera link temporário de download do arquivo de uma mensagem.
@@ -324,9 +372,17 @@ func (o *omniClient) GetConversationHistory(ctx context.Context, protocol string
 }
 
 func (o *omniClient) CloseConversation(ctx context.Context, protocol string) (*CloseConversationResponse, error) {
+	return o.CloseConversationWith(ctx, protocol, CloseConversationRequest{})
+}
+
+func (o *omniClient) CloseConversationWith(ctx context.Context, protocol string, req CloseConversationRequest) (*CloseConversationResponse, error) {
 	var out CloseConversationResponse
 	path := fmt.Sprintf(pathOmniConversationClose, url.PathEscape(protocol))
-	if err := o.http.post(ctx, path, nil, nil, &out); err != nil {
+	var body any
+	if req.Classification != "" {
+		body = req
+	}
+	if err := o.http.post(ctx, path, nil, body, &out); err != nil {
 		return nil, fmt.Errorf("interage/omni.CloseConversation: %w", err)
 	}
 	return &out, nil
