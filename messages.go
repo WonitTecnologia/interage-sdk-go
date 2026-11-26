@@ -80,14 +80,26 @@ type SendTemplateRequest struct {
 	MediaFilename string `json:"media_filename,omitempty"`
 	// AssignedUserID, quando informado, cria um atendimento outbound atribuído ao agente.
 	AssignedUserID string `json:"assigned_user_id,omitempty"`
+	// QueueID é a fila do atendimento criado (opcional; exige AssignedUserID).
+	QueueID *int32 `json:"queue_id,omitempty"`
+	// IdempotencyKey (opcional, até 128 caracteres) vai no header Idempotency-Key: por
+	// 24h, repetir a mesma chave devolve a resposta original sem enviar de novo. Use
+	// uma chave nova por envio e repita a mesma ao tentar de novo após timeout.
+	IdempotencyKey string `json:"-"`
 }
 
 // SendTemplateResponse é o retorno do envio de template.
 type SendTemplateResponse struct {
-	MessageID         string `json:"message_id"`
+	// MessageID é o ID da mensagem no provedor (modo sem atendimento).
+	MessageID string `json:"message_id"`
+	// InternalMessageID só vem no modo com atendimento (AssignedUserID); é ele que
+	// GetMessageStatus aceita.
 	InternalMessageID *int64 `json:"internal_message_id,omitempty"`
 	ConversationID    *int64 `json:"conversation_id,omitempty"`
 	Protocol          string `json:"protocol,omitempty"`
+	// Replayed é true quando a resposta é a guardada de um envio anterior com a mesma
+	// IdempotencyKey (header Idempotency-Replayed) — nada foi enviado de novo.
+	Replayed bool `json:"-"`
 }
 
 // SendMessageRequest são os dados para envio de mensagem não-template
@@ -105,17 +117,25 @@ type SendMessageRequest struct {
 	Caption string `json:"caption,omitempty"`
 	// Filename é o nome do arquivo (para type=file).
 	Filename string `json:"filename,omitempty"`
-	// Latitude/Longitude/Address/LocationName são usados em type=location.
-	Latitude     float64 `json:"latitude,omitempty"`
-	Longitude    float64 `json:"longitude,omitempty"`
-	Address      string  `json:"address,omitempty"`
-	LocationName string  `json:"location_name,omitempty"`
+	// Latitude (-90 a 90) e Longitude (-180 a 180) são obrigatórios em type=location.
+	// Ponteiros para que 0 (equador/Greenwich) seja enviado: use interage.Ptr(-26.91).
+	Latitude  *float64 `json:"latitude,omitempty"`
+	Longitude *float64 `json:"longitude,omitempty"`
+	// Address/LocationName são opcionais em type=location.
+	Address      string `json:"address,omitempty"`
+	LocationName string `json:"location_name,omitempty"`
+	// IdempotencyKey (opcional, até 128 caracteres) vai no header Idempotency-Key.
+	// Ver SendTemplateRequest.IdempotencyKey.
+	IdempotencyKey string `json:"-"`
 }
 
 // SendMessageResponse é o retorno do envio de mensagem.
 type SendMessageResponse struct {
 	MessageID         string `json:"message_id"`
 	InternalMessageID int64  `json:"internal_message_id"`
+	// Replayed é true quando a resposta é a guardada de um envio anterior com a mesma
+	// IdempotencyKey — nada foi enviado de novo.
+	Replayed bool `json:"-"`
 }
 
 // MessageStatusResponse é o status de entrega de uma mensagem enviada.
@@ -159,8 +179,10 @@ type MessagesCase interface {
 	// Use o gupshup_id como template_id nos envios e campanhas.
 	ListTemplates(ctx context.Context, params ListTemplatesParams) (*ListTemplatesResponse, error)
 	// SendTemplate envia um template HSM aprovado para um destinatário.
+	// Provedor recusou: erro com ErrSendFailed (502).
 	SendTemplate(ctx context.Context, req SendTemplateRequest) (*SendTemplateResponse, error)
 	// SendMessage envia uma mensagem não-template sobre uma conversa com sessão ativa de 24h.
+	// Provedor recusou: erro com ErrSendFailed (502) e APIError.InternalMessageID.
 	SendMessage(ctx context.Context, req SendMessageRequest) (*SendMessageResponse, error)
 	// GetMessageStatus consulta o status de entrega pelo internal_message_id
 	// (numérico, como string — ex.: "1042").
@@ -206,17 +228,21 @@ func (m *messagesClient) ListTemplates(ctx context.Context, params ListTemplates
 
 func (m *messagesClient) SendTemplate(ctx context.Context, req SendTemplateRequest) (*SendTemplateResponse, error) {
 	var out SendTemplateResponse
-	if err := m.http.post(ctx, pathTemplateSend, nil, req, &out); err != nil {
+	meta, err := m.http.postWith(ctx, pathTemplateSend, nil, req, requestOptions{idempotencyKey: req.IdempotencyKey}, &out)
+	if err != nil {
 		return nil, fmt.Errorf("interage/messages.SendTemplate: %w", err)
 	}
+	out.Replayed = meta.replayed
 	return &out, nil
 }
 
 func (m *messagesClient) SendMessage(ctx context.Context, req SendMessageRequest) (*SendMessageResponse, error) {
 	var out SendMessageResponse
-	if err := m.http.post(ctx, pathMessageSend, nil, req, &out); err != nil {
+	meta, err := m.http.postWith(ctx, pathMessageSend, nil, req, requestOptions{idempotencyKey: req.IdempotencyKey}, &out)
+	if err != nil {
 		return nil, fmt.Errorf("interage/messages.SendMessage: %w", err)
 	}
+	out.Replayed = meta.replayed
 	return &out, nil
 }
 

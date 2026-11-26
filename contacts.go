@@ -14,7 +14,7 @@ import (
 // ContactIdentityResponse é uma identidade de canal do contato
 // (telefone, username, chat_id, etc.).
 type ContactIdentityResponse struct {
-	// Channel: phone | whatsapp | sms | telegram | instagram | facebook | sip
+	// Channel: phone | whatsapp | telegram | instagram | facebook | sip (cadastros antigos podem ter sms)
 	Channel string `json:"channel"`
 	// IDType depende do canal: phone | username | chat_id | handle | extension | profile_id
 	IDType string `json:"id_type"`
@@ -22,6 +22,13 @@ type ContactIdentityResponse struct {
 	IDValue string `json:"id_value"`
 	// IsPrimary marca a identidade principal do contato.
 	IsPrimary bool `json:"is_primary"`
+}
+
+// ContactLabelResponse é uma etiqueta atribuída ao contato.
+type ContactLabelResponse struct {
+	// TenantSeq é o número da etiqueta, o mesmo aceito em BatchContactItem.Labels.
+	TenantSeq int64  `json:"tenant_seq"`
+	Name      string `json:"name"`
 }
 
 // ContactResponse é um contato da central de contatos do tenant.
@@ -32,8 +39,11 @@ type ContactResponse struct {
 	Email       string `json:"email,omitempty"`
 	Company     string `json:"company,omitempty"`
 	ReplaceName bool   `json:"replace_name"`
-	// Visibility: public | private
-	Visibility string `json:"visibility"`
+	// Deprecated: a API não devolve mais visibility (quem vê cada contato agora é
+	// definido pelos grupos de contatos); o campo fica sempre vazio.
+	Visibility string `json:"-"`
+	// Labels são as etiquetas atribuídas ao contato.
+	Labels []ContactLabelResponse `json:"labels"`
 	// CustomInfo valores dos campos personalizados do tenant (JSON bruto).
 	CustomInfo json.RawMessage `json:"custom_info,omitempty"`
 	// Identities formas de contato (telefones, usernames, etc.).
@@ -58,7 +68,7 @@ type ListContactsResponse struct {
 
 // ListContactsParams filtra a listagem de contatos.
 type ListContactsParams struct {
-	// Search é a busca geral: nome, empresa, identidades e campos personalizados.
+	// Search é a busca geral: nome, empresa, e-mail, CPF, identidades e campos personalizados.
 	Search string
 	// Name filtra por nome/empresa (ignorado se Search informado).
 	Name string
@@ -79,8 +89,9 @@ type ContactsCase interface {
 	// GetContact retorna um contato pelo UUID.
 	// Retorna ErrNotFound quando o contato não existe.
 	GetContact(ctx context.Context, id string) (*ContactResponse, error)
-	// GetContactByPhone retorna um contato pelo número de telefone
-	// (normalizado para dígitos; busca nos canais phone, whatsapp e sms).
+	// GetContactByPhone retorna um contato pelo número de telefone. Só os dígitos são
+	// comparados, nos canais phone e whatsapp (e sms em cadastros antigos), com ou sem
+	// o DDI 55 e o 9º dígito. Número sem nenhum dígito: ErrBadRequest.
 	// Retorna ErrNotFound quando não encontra.
 	GetContactByPhone(ctx context.Context, phone string) (*ContactResponse, error)
 }

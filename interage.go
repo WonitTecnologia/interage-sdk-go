@@ -25,14 +25,23 @@ import (
 )
 
 // Version é a versão do SDK, enviada no User-Agent (interage-sdk-go/<Version>).
-const Version = "0.3.1"
+const Version = "0.4.0"
 
 // Options configura opções adicionais do cliente. Todos os campos são opcionais.
 type Options struct {
-	// Timeout do http.Client interno. Padrão: 30s. Ignorado se HTTPClient for informado.
+	// Timeout do http.Client interno (requisição inteira). Padrão: 30s. Ignorado se HTTPClient for informado.
 	Timeout time.Duration
+	// ConnectTimeout limita só o estabelecimento da conexão TCP. Padrão: 10s.
+	// Ignorado se HTTPClient for informado.
+	ConnectTimeout time.Duration
 	// HTTPClient substitui o http.Client interno (proxy, transporte customizado, etc.).
+	// O cliente interno não segue redirecionamentos; com um HTTPClient próprio,
+	// configure CheckRedirect para devolver http.ErrUseLastResponse.
 	HTTPClient *http.Client
+	// OnResponse, quando informado, é chamado a cada resposta HTTP com o status, o
+	// consumo da cota (X-RateLimit-Limit / X-RateLimit-Remaining) e o
+	// Idempotency-Replayed. Precisa ser seguro para uso concorrente.
+	OnResponse func(ResponseInfo)
 	// Insecure força HTTP (sem TLS) ao invés de HTTPS. Padrão: false.
 	// Útil para ambientes de desenvolvimento local.
 	Insecure bool
@@ -51,6 +60,9 @@ type Client struct {
 	// Telephony — ramais, histórico de ligações, click-to-call e gravações.
 	Telephony TelephonyCase
 }
+
+// Ptr devolve um ponteiro para v — útil nos campos opcionais (ex.: Latitude, QueueID).
+func Ptr[T any](v T) *T { return &v }
 
 // NewClient cria o cliente do SDK.
 //
@@ -78,14 +90,17 @@ func NewClient(baseURL, token string, opts *Options) (*Client, error) {
 		baseURL = scheme + "://" + baseURL
 	}
 
-	var timeout time.Duration
+	var timeout, connectTimeout time.Duration
 	var custom *http.Client
+	var onResponse func(ResponseInfo)
 	if opts != nil {
 		timeout = opts.Timeout
+		connectTimeout = opts.ConnectTimeout
 		custom = opts.HTTPClient
+		onResponse = opts.OnResponse
 	}
 
-	hc := newHTTPClient(baseURL, token, timeout, custom)
+	hc := newHTTPClient(baseURL, token, timeout, connectTimeout, custom, onResponse)
 	return &Client{
 		Campaigns: newCampaignsClient(hc),
 		Messages:  newMessagesClient(hc),

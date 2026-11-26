@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strconv"
 )
@@ -60,6 +61,7 @@ type CreateCampaignRequest struct {
 	FileContent []byte
 
 	// TemplateParams são os valores das variáveis do template, na ordem em que aparecem.
+	// Valor vazio devolve 400 (o provedor recusaria todos os envios).
 	TemplateParams []string
 	// Description é a descrição da campanha.
 	Description string
@@ -76,8 +78,13 @@ type CreateCampaignRequest struct {
 	// ReplyWindowHours é a janela, em horas após o disparo, da resposta sem citação
 	// (1 a 72). Zero = padrão da API (24). Só vale com ReplyWithoutContext.
 	ReplyWindowHours int
-	// Settings são configurações extras (ex.: {"delay_ms": 1000}).
+	// Settings são as configurações de envio. Chaves aceitas: delay_ms (1-2000),
+	// max_retries (0-10), retry_delay_seconds (1-86400), dispatch_days ([0-6]) e
+	// dispatch_periods (até 3, ex.: [{"start":"08:00","end":"18:00"}]). Outra chave devolve 400.
 	Settings map[string]any
+	// IdempotencyKey (opcional, até 128 caracteres) vai no header Idempotency-Key: por
+	// 24h, repetir a mesma chave devolve a campanha já criada, sem criar outra.
+	IdempotencyKey string
 }
 
 // CreateCampaignResponse é o retorno da criação de campanha.
@@ -87,17 +94,40 @@ type CreateCampaignResponse struct {
 	Status     string `json:"status"`
 	MailingID  string `json:"mailing_id"`
 	FileName   string `json:"file_name"`
+	// Replayed é true quando a campanha já tinha sido criada com a mesma
+	// IdempotencyKey (a API responde 200 em vez de 201) — nada novo foi criado.
+	Replayed bool `json:"-"`
+}
+
+// CampaignImportResponse é o resultado da importação do CSV (só no detalhe — Get).
+type CampaignImportResponse struct {
+	FileName string `json:"file_name"`
+	// Status: pending | processing | done | failed.
+	Status string `json:"status"`
+	// TotalRows conta as linhas de dados do arquivo.
+	TotalRows     int `json:"total_rows"`
+	ProcessedRows int `json:"processed_rows"`
+	// FailedRows conta as recusadas (telefone inválido, repetido no arquivo, linha mal formatada).
+	FailedRows int `json:"failed_rows"`
+	// ErrorMessage diz por que a importação inteira falhou.
+	ErrorMessage string `json:"error_message,omitempty"`
 }
 
 // CampaignResponse é a visão de uma campanha (listagem e detalhe).
 type CampaignResponse struct {
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	Description    string `json:"description,omitempty"`
-	Channel        string `json:"channel"`
-	Status         string `json:"status"`
-	TemplateID     string `json:"template_id,omitempty"`
-	ScheduledAt    string `json:"scheduled_at,omitempty"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Channel     string `json:"channel"`
+	Status      string `json:"status"`
+	TemplateID  string `json:"template_id,omitempty"`
+	// InstanceID é a instância WhatsApp de envio.
+	InstanceID string `json:"instance_id,omitempty"`
+	// AutoStart indica se o disparo começa sozinho em StartAt.
+	AutoStart bool `json:"auto_start"`
+	// Deprecated: a API não devolve mais scheduled_at; o campo fica sempre vazio.
+	// Use StartAt com AutoStart.
+	ScheduledAt    string `json:"-"`
 	StartAt        string `json:"start_at,omitempty"`
 	EndAt          string `json:"end_at,omitempty"`
 	TotalContacts  int    `json:"total_contacts"`
@@ -112,9 +142,12 @@ type CampaignResponse struct {
 	ReplyWithoutContext bool `json:"reply_without_context"`
 	// ReplyWindowHours é a janela, em horas após o disparo, em que a resposta sem
 	// citação conta (1 a 72; padrão 24). Só vale com ReplyWithoutContext.
-	ReplyWindowHours int    `json:"reply_window_hours"`
-	CreatedAt        string `json:"created_at"`
-	UpdatedAt        string `json:"updated_at"`
+	ReplyWindowHours int `json:"reply_window_hours"`
+	// Import é o resultado da importação do CSV; vem só em Get, não na listagem
+	// nem nas transições. nil enquanto não há importação registrada.
+	Import    *CampaignImportResponse `json:"import,omitempty"`
+	CreatedAt string                  `json:"created_at"`
+	UpdatedAt string                  `json:"updated_at"`
 }
 
 // ListCampaignsResponse é o envelope paginado da listagem de campanhas.
@@ -133,7 +166,7 @@ type ListCampaignsResponse struct {
 
 // ListCampaignsParams filtra a listagem de campanhas.
 type ListCampaignsParams struct {
-	// Search busca por nome da campanha.
+	// Search busca por nome, UUID ou canal da campanha.
 	Search string
 	// Status filtra por status (pending, ready, running, paused, completed, canceled, failed...).
 	Status string
@@ -236,9 +269,12 @@ func (c *campaignsClient) Create(ctx context.Context, req CreateCampaignRequest)
 	}
 
 	var out CreateCampaignResponse
-	if err := c.http.postMultipart(ctx, pathCampaigns, fields, "file", req.FileName, req.FileContent, &out); err != nil {
+	meta, err := c.http.postMultipart(ctx, pathCampaigns, fields, "file", req.FileName, req.FileContent, requestOptions{idempotencyKey: req.IdempotencyKey}, &out)
+	if err != nil {
 		return nil, fmt.Errorf("interage/campaigns.Create: %w", err)
 	}
+	// A criação repetida responde 200 (a nova, 201); o header Idempotency-Replayed também vale.
+	out.Replayed = meta.replayed || meta.statusCode == http.StatusOK
 	return &out, nil
 }
 
