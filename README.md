@@ -1,5 +1,9 @@
 # interage-sdk-go
 
+> **Esta é a v1 da API pública, que deixa de funcionar em 15/03/2027.** Tokens novos são só da
+> v2. Use o módulo [`github.com/WonitTecnologia/interage-sdk-go/v2`](v2/README.md), que tem o
+> [guia de migração](v2/README.md#migrar-da-v1). Este módulo recebe só correções até lá.
+
 SDK Go oficial da **API pública de clientes** da plataforma **Interage+** (Wonit).
 
 Todas as respostas são **tipadas** — você nunca precisa fazer parsing manual de JSON.

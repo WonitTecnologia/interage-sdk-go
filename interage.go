@@ -12,6 +12,10 @@
 // Cada arquivo de domínio é dividido pelas seções Modelos / Interface / Implementação.
 // Em colisão de nome entre domínios, o tipo recebe o domínio como prefixo
 // (ex.: TelephonyTempLinkResponse e OmniTempLinkResponse).
+//
+// Deprecated: este pacote usa a v1 da API pública (/api/public), que deixa de funcionar em
+// 15/03/2027 e não aceita tokens novos. Use github.com/WonitTecnologia/interage-sdk-go/v2,
+// com um token da v2; o guia de migração está no README do v2.
 package interage
 
 import (
