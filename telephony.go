@@ -162,7 +162,7 @@ type ListCallHistoryParams struct {
 	// Para prefixo, termine com * (ex.: "10*" traz 10, 100, 1017).
 	Extension string
 	// CallResult filtra por resultado: ANSWERED | NO_ANSWER | BUSY | FAILED | ABANDONED |
-	// IVR_ENDED | VOICEMAIL | UNAVAILABLE.
+	// IVR_ENDED | VOICEMAIL | UNAVAILABLE | BLOCKED.
 	CallResult string
 	// CallType filtra por tipo de chamada (ex.: inbound, outbound, internal).
 	CallType string

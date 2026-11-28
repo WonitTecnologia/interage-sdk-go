@@ -53,7 +53,7 @@ type Call struct {
 	Extension *string    `json:"extension"` // ramal que atendeu ou tocou (entrada e interna); null na saída
 	Queue     *CallQueue `json:"queue"`
 	Agent     *CallAgent `json:"agent"`
-	// Valores: answered, no_answer, busy, failed, abandoned, ivr_ended, voicemail, unavailable.
+	// Valores: answered, no_answer, busy, failed, abandoned, ivr_ended, voicemail, unavailable, blocked.
 	Result          *string       `json:"result"`
 	HangupCause     *string       `json:"hangup_cause"`
 	Abandoned       bool          `json:"abandoned"`
@@ -89,7 +89,7 @@ type CallDetail struct {
 	Extension *string    `json:"extension"`
 	Queue     *CallQueue `json:"queue"`
 	Agent     *CallAgent `json:"agent"`
-	// Valores: answered, no_answer, busy, failed, abandoned, ivr_ended, voicemail, unavailable.
+	// Valores: answered, no_answer, busy, failed, abandoned, ivr_ended, voicemail, unavailable, blocked.
 	Result          *string             `json:"result"`
 	HangupCause     *string             `json:"hangup_cause"`
 	Abandoned       bool                `json:"abandoned"`

@@ -185,7 +185,8 @@
                         "abandoned",
                         "ivr_ended",
                         "voicemail",
-                        "unavailable"
+                        "unavailable",
+                        "blocked"
                     ],
                     "example": "answered",
                     "type": "string"
@@ -316,7 +317,8 @@
                         "abandoned",
                         "ivr_ended",
                         "voicemail",
-                        "unavailable"
+                        "unavailable",
+                        "blocked"
                     ],
                     "example": "answered",
                     "type": "string"
@@ -4411,7 +4413,7 @@
         },
         "/public/v2/calls": {
             "get": {
-                "description": "Lista as ligações **encerradas e processadas** (cerca de 30 s depois do fim) que começaram no período, da mais recente para a mais antiga.\n\n**Período:** `from` e `to` em ISO 8601 **com fuso** (ex.: `2026-11-01T00:00:00-03:00`), obrigatórios; `to` depois de `from`, no máximo 3 meses. Vale o início da ligação, com `to` exclusivo.\n\n**Filtros:** `extension` (ramal em qualquer ponta — origem, destino, atendente ou transferência; exato, ou prefixo com `*` no fim: `10*`), `direction`, `result` e `number` (trecho do número na origem ou no destino).\n\n**Paginação por cursor** (padrão da v2): `page_size` (1–100, padrão 50) e `cursor`.\n\n`route`: `extension`, `queue`, `ivr`, `trunk`, `passthrough` ou `whatsapp`. `result`: `answered`, `no_answer`, `busy`, `failed`, `abandoned` (desligou na fila antes de ser atendido — vale sobre o resultado técnico), `ivr_ended`, `voicemail` ou `unavailable`. `extension` é o ramal que atendeu ou tocou (entrada e interna); na saída é null e o ramal que discou está em `from.number`. Horários no fuso do cliente.",
+                "description": "Lista as ligações **encerradas e processadas** (cerca de 30 s depois do fim) que começaram no período, da mais recente para a mais antiga.\n\n**Período:** `from` e `to` em ISO 8601 **com fuso** (ex.: `2026-11-01T00:00:00-03:00`), obrigatórios; `to` depois de `from`, no máximo 3 meses. Vale o início da ligação, com `to` exclusivo.\n\n**Filtros:** `extension` (ramal em qualquer ponta — origem, destino, atendente ou transferência; exato, ou prefixo com `*` no fim: `10*`), `direction`, `result` e `number` (trecho do número na origem ou no destino).\n\n**Paginação por cursor** (padrão da v2): `page_size` (1–100, padrão 50) e `cursor`.\n\n`route`: `extension`, `queue`, `ivr`, `trunk`, `passthrough` ou `whatsapp`. `result`: `answered`, `no_answer`, `busy`, `failed`, `abandoned` (desligou na fila antes de ser atendido — vale sobre o resultado técnico), `ivr_ended`, `voicemail`, `unavailable` ou `blocked` (entrada recusada: número na lista de bloqueio). `extension` é o ramal que atendeu ou tocou (entrada e interna); na saída é null e o ramal que discou está em `from.number`. Horários no fuso do cliente.",
                 "operationId": "ListCallsV2",
                 "parameters": [
                     {
@@ -4455,7 +4457,8 @@
                             "abandoned",
                             "ivr_ended",
                             "voicemail",
-                            "unavailable"
+                            "unavailable",
+                            "blocked"
                         ],
                         "in": "query",
                         "name": "result",

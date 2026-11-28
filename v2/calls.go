@@ -17,7 +17,7 @@ type ListCallsParams struct {
 	Extension string `query:"extension"`
 	// Direction: inbound, outbound ou internal.
 	Direction string `query:"direction"`
-	// Result: answered, no_answer, busy, failed, abandoned, ivr_ended, voicemail ou unavailable.
+	// Result: answered, no_answer, busy, failed, abandoned, ivr_ended, voicemail, unavailable ou blocked.
 	Result string `query:"result"`
 	// Number: trecho do número na origem ou no destino.
 	Number string `query:"number"`
